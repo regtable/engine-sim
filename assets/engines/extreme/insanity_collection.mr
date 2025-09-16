@@ -1,0 +1,445 @@
+import "engine_sim.mr"
+
+units units()
+constants constants()
+impulse_response_library ir_lib()
+label cycle(2 * 360 * units.deg)
+
+private node wires_i4 {
+    output wire1: ignition_wire();
+    output wire2: ignition_wire();
+    output wire3: ignition_wire();
+    output wire4: ignition_wire();
+}
+
+private node avgas_110 {
+    alias output __out:
+        fuel(
+            name: "110 AvGas [Hyper Blend]",
+            molecular_mass: 110 * units.g,
+            energy_density: 52.5 * units.kJ / units.g,
+            density: 0.72 * units.kg / units.L,
+            molecular_afr: 14.5,
+            turbulence_to_flame_speed_ratio:
+                function(10.0)
+                    .add_sample(0.0, 6.0)
+                    .add_sample(2.0, 9.0)
+                    .add_sample(4.0, 13.0)
+                    .add_sample(6.0, 18.0)
+                    .add_sample(8.0, 24.0)
+                    .add_sample(10.0, 30.0),
+            max_burning_efficiency: 1.1,
+            burning_efficiency_randomness: 0.15,
+            low_efficiency_attenuation: 0.85,
+            max_turbulence_effect: 15.0,
+            max_dilution_effect: 20.0
+        );
+}
+
+private node mega_transmission {
+    alias output __out: trans;
+
+    transmission trans(
+        max_clutch_torque: 5.0e6 * units.lb_ft
+    )
+        .add_gear(18.000000)
+        .add_gear(15.881192)
+        .add_gear(14.011792)
+        .add_gear(12.362442)
+        .add_gear(10.907239)
+        .add_gear(9.623331)
+        .add_gear(8.490554)
+        .add_gear(7.491117)
+        .add_gear(6.609326)
+        .add_gear(5.831332)
+        .add_gear(5.144917)
+        .add_gear(4.539301)
+        .add_gear(4.004972)
+        .add_gear(3.533541)
+        .add_gear(3.117602)
+        .add_gear(2.750624)
+        .add_gear(2.426844)
+        .add_gear(2.141176)
+        .add_gear(1.889135)
+        .add_gear(1.666762)
+        .add_gear(1.470565)
+        .add_gear(1.297462)
+        .add_gear(1.144736)
+        .add_gear(1.009987)
+        .add_gear(0.891100)
+        .add_gear(0.786207)
+        .add_gear(0.693662)
+        .add_gear(0.612010)
+        .add_gear(0.539969)
+        .add_gear(0.476408)
+        .add_gear(0.420330)
+        .add_gear(0.370852)
+        .add_gear(0.327198)
+        .add_gear(0.288683)
+        .add_gear(0.254702)
+        .add_gear(0.224721)
+        .add_gear(0.198268)
+        .add_gear(0.174930)
+        .add_gear(0.154339)
+        .add_gear(0.136171)
+        .add_gear(0.120142)
+        .add_gear(0.106000)
+        .add_gear(0.093523)
+        .add_gear(0.082514)
+        .add_gear(0.072801)
+        .add_gear(0.064232)
+        .add_gear(0.056671)
+        .add_gear(0.050000);
+}
+
+private node hyper_vehicle {
+    alias output __out:
+        vehicle(
+            mass: 1500 * units.kg,
+            drag_coefficient: 0.08,
+            cross_sectional_area: (62 * units.inch) * (46 * units.inch),
+            diff_ratio: 1.5,
+            tire_radius: 14 * units.inch,
+            rolling_resistance: 800 * units.N
+        );
+}
+
+private node hyper_camshaft_builder {
+    input lobe_profile: harmonic_cam_lobe(
+        duration_at_50_thou: 310 * units.deg,
+        gamma: 0.65,
+        lift: 0.020 * units.m,
+        steps: 120
+    );
+    input intake_lobe_profile: lobe_profile;
+    input exhaust_lobe_profile: lobe_profile;
+    input lobe_separation: 112.0 * units.deg;
+    input intake_lobe_center: lobe_separation;
+    input exhaust_lobe_center: lobe_separation;
+    input advance: -4.0 * units.deg;
+    input base_radius: 0.9 * units.inch;
+
+    output intake_cam: _intake_cam;
+    output exhaust_cam: _exhaust_cam;
+
+    camshaft_parameters params(
+        advance: advance,
+        base_radius: base_radius
+    )
+
+    camshaft _intake_cam(params, lobe_profile: intake_lobe_profile)
+    camshaft _exhaust_cam(params, lobe_profile: exhaust_lobe_profile)
+
+    label rot(2 * (360 / 4.0) * units.deg)
+    label rot360(360 * units.deg)
+
+    _exhaust_cam
+        .add_lobe(rot360 - exhaust_lobe_center + 0 * rot)
+        .add_lobe(rot360 - exhaust_lobe_center + 1 * rot)
+        .add_lobe(rot360 - exhaust_lobe_center + 2 * rot)
+        .add_lobe(rot360 - exhaust_lobe_center + 3 * rot)
+
+    _intake_cam
+        .add_lobe(rot360 + intake_lobe_center + 0 * rot)
+        .add_lobe(rot360 + intake_lobe_center + 1 * rot)
+        .add_lobe(rot360 + intake_lobe_center + 2 * rot)
+        .add_lobe(rot360 + intake_lobe_center + 3 * rot)
+}
+
+private node hyper_head {
+    input intake_camshaft;
+    input exhaust_camshaft;
+    input chamber_volume: 20 * units.cc;
+    input intake_runner_volume: 600 * units.cc;
+    input intake_runner_cross_section_area: (4.5 * units.inch) * (4.5 * units.inch);
+    input exhaust_runner_volume: 220 * units.cc;
+    input exhaust_runner_cross_section_area: (3.5 * units.inch) * (3.5 * units.inch);
+
+    alias output __out: head;
+
+    function intake_flow(50 * units.thou)
+    intake_flow
+        .add_flow_sample(0 * units.mm, 0)
+        .add_flow_sample(50 * units.thou, 450)
+        .add_flow_sample(100 * units.thou, 780)
+        .add_flow_sample(150 * units.thou, 1150)
+        .add_flow_sample(200 * units.thou, 1500)
+        .add_flow_sample(250 * units.thou, 1750)
+        .add_flow_sample(300 * units.thou, 1900)
+        .add_flow_sample(350 * units.thou, 2050)
+        .add_flow_sample(400 * units.thou, 2150)
+        .add_flow_sample(450 * units.thou, 2200);
+
+    function exhaust_flow(50 * units.thou)
+    exhaust_flow
+        .add_flow_sample(0 * units.mm, 0)
+        .add_flow_sample(50 * units.thou, 320)
+        .add_flow_sample(100 * units.thou, 600)
+        .add_flow_sample(150 * units.thou, 900)
+        .add_flow_sample(200 * units.thou, 1200)
+        .add_flow_sample(250 * units.thou, 1500)
+        .add_flow_sample(300 * units.thou, 1750)
+        .add_flow_sample(350 * units.thou, 1850)
+        .add_flow_sample(400 * units.thou, 1950)
+        .add_flow_sample(450 * units.thou, 2050);
+
+    generic_cylinder_head head(
+        chamber_volume: chamber_volume,
+        intake_runner_volume: intake_runner_volume,
+        intake_runner_cross_section_area: intake_runner_cross_section_area,
+        exhaust_runner_volume: exhaust_runner_volume,
+        exhaust_runner_cross_section_area: exhaust_runner_cross_section_area,
+        intake_port_flow: intake_flow,
+        exhaust_port_flow: exhaust_flow,
+        valvetrain: standard_valvetrain(
+            intake_camshaft: intake_camshaft,
+            exhaust_camshaft: exhaust_camshaft
+        )
+    )
+}
+
+private node insane_i4_base {
+    input engine_name [string]: "Hyper Madness I4";
+    input forced_induction_type [string]: "turbocharger";
+    input forced_induction_max_boost: 100 * units.psi;
+    input forced_induction_spool_time: 0.35;
+    input forced_induction_decay_time: 0.4;
+    input forced_induction_efficiency: 0.75;
+    input forced_induction_idle_fraction: 0.2;
+    input redline: 17000 * units.rpm;
+    input fuel: avgas_110();
+
+    alias output __out: engine;
+
+    engine engine(
+        name: engine_name,
+        starter_torque: 1.0e6 * units.lb_ft,
+        starter_speed: 1500 * units.rpm,
+        redline: redline,
+        dyno_min_speed: 2000 * units.rpm,
+        dyno_max_speed: 20000 * units.rpm,
+        fuel: fuel,
+        throttle_gamma: 1.15,
+        hf_gain: 0.02,
+        noise: 0.45,
+        jitter: 0.85,
+        simulation_frequency: 60000
+    )
+
+    wires_i4 wires()
+
+    label stroke(120 * units.mm)
+    label bore(115 * units.mm)
+    label rod_length(7.5 * units.inch)
+    label compression_height(1.1 * units.inch)
+
+    crankshaft c0(
+        throw: stroke / 2,
+        flywheel_mass: 60 * units.lb,
+        mass: 140 * units.lb,
+        friction_torque: 2000 * units.lb_ft,
+        moment_of_inertia: 0.22986844776863666 * 12.0,
+        position_x: 0.0,
+        position_y: 0.0,
+        tdc: constants.pi / 2
+    )
+
+    rod_journal rj0(angle: 0.0 * units.deg)
+    rod_journal rj1(angle: 180.0 * units.deg)
+    rod_journal rj2(angle: 180.0 * units.deg)
+    rod_journal rj3(angle: 0.0 * units.deg)
+    c0
+        .add_rod_journal(rj0)
+        .add_rod_journal(rj1)
+        .add_rod_journal(rj2)
+        .add_rod_journal(rj3)
+
+    piston_parameters piston_params(
+        mass: 850 * units.g,
+        compression_height: compression_height,
+        wrist_pin_position: 0.0,
+        displacement: 0.0
+    )
+
+    connecting_rod_parameters cr_params(
+        mass: 1.4 * units.kg,
+        moment_of_inertia: 0.008,
+        center_of_mass: 0.0,
+        length: rod_length
+    )
+
+    intake intake(
+        plenum_volume: 12.5 * units.L,
+        plenum_cross_section_area: 650.0 * units.cm2,
+        intake_flow_rate: k_carb(5200.0),
+        idle_flow_rate: k_carb(200.0),
+        runner_flow_rate: k_carb(2200.0),
+        runner_length: 5.0 * units.inch,
+        molecular_afr: 12.0,
+        idle_throttle_plate_position: 0.9,
+        velocity_decay: 0.08,
+        forced_induction_type: forced_induction_type,
+        forced_induction_max_boost: forced_induction_max_boost,
+        forced_induction_spool_time: forced_induction_spool_time,
+        forced_induction_decay_time: forced_induction_decay_time,
+        forced_induction_efficiency: forced_induction_efficiency,
+        forced_induction_idle_fraction: forced_induction_idle_fraction
+    )
+
+    exhaust_system_parameters es_params(
+        outlet_flow_rate: k_carb(15000.0),
+        primary_tube_length: 32.0 * units.inch,
+        primary_flow_rate: k_carb(5200.0),
+        velocity_decay: 0.08,
+        volume: 450.0 * units.L
+    )
+
+    exhaust_system exhaust0(
+        es_params,
+        audio_volume: 12.0,
+        impulse_response: ir_lib.real_engine_0
+    )
+
+    exhaust_system exhaust1(
+        es_params,
+        audio_volume: 12.0,
+        impulse_response: ir_lib.real_engine_1
+    )
+
+    cylinder_bank_parameters bank_params(
+        bore: bore,
+        deck_height: stroke / 2 + rod_length + compression_height
+    )
+
+    cylinder_bank b0(bank_params, angle: 0.0 * units.deg)
+    b0
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.0005)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj0,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire1,
+            sound_attenuation: 0.9
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.0005)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj1,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire2,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.0005)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj2,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire3,
+            sound_attenuation: 0.95
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.0005)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj3,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire4,
+            sound_attenuation: 1.05
+        )
+
+    engine
+        .add_cylinder_bank(b0)
+
+    engine.add_crankshaft(c0)
+
+    hyper_camshaft_builder camshaft()
+
+    b0.set_cylinder_head(
+        hyper_head(
+            intake_camshaft: camshaft.intake_cam,
+            exhaust_camshaft: camshaft.exhaust_cam,
+            chamber_volume: 28 * units.cc,
+            intake_runner_volume: 650 * units.cc,
+            exhaust_runner_volume: 250 * units.cc
+        )
+    )
+
+    function timing_curve(2000 * units.rpm)
+    timing_curve
+        .add_sample(0000 * units.rpm, -30 * units.deg)
+        .add_sample(3000 * units.rpm, -32 * units.deg)
+        .add_sample(6000 * units.rpm, -40 * units.deg)
+        .add_sample(9000 * units.rpm, -45 * units.deg)
+        .add_sample(12000 * units.rpm, -50 * units.deg)
+        .add_sample(15000 * units.rpm, -55 * units.deg)
+        .add_sample(18000 * units.rpm, -60 * units.deg)
+        .add_sample(21000 * units.rpm, -62 * units.deg)
+        .add_sample(24000 * units.rpm, -65 * units.deg)
+
+    ignition_module ignition_module(
+        timing_curve: timing_curve,
+        rev_limit: redline + 2000 * units.rpm,
+        limiter_duration: 0.05
+    )
+    ignition_module
+        .connect_wire(wires.wire1, (0.0 / 4.0) * cycle)
+        .connect_wire(wires.wire3, (3.0 / 4.0) * cycle)
+        .connect_wire(wires.wire4, (2.0 / 4.0) * cycle)
+        .connect_wire(wires.wire2, (1.0 / 4.0) * cycle)
+
+    engine.add_ignition_module(ignition_module)
+}
+
+public node warp_drive_inline4 {
+    alias output __out:
+        insane_i4_base(
+            engine_name: "Warp Drive Inline-4 (Turbo)",
+            forced_induction_type: "turbocharger",
+            forced_induction_max_boost: 120 * units.psi,
+            forced_induction_spool_time: 0.25,
+            forced_induction_decay_time: 0.35,
+            forced_induction_efficiency: 0.72,
+            forced_induction_idle_fraction: 0.25,
+            redline: 18500 * units.rpm
+        );
+}
+
+public node supernova_inline4 {
+    alias output __out:
+        insane_i4_base(
+            engine_name: "Supernova Inline-4 (Supercharged)",
+            forced_induction_type: "supercharger",
+            forced_induction_max_boost: 85 * units.psi,
+            forced_induction_spool_time: 0.05,
+            forced_induction_decay_time: 0.1,
+            forced_induction_efficiency: 0.88,
+            forced_induction_idle_fraction: 0.4,
+            redline: 16500 * units.rpm
+        );
+}
+
+public node quantum_flux_inline4 {
+    alias output __out:
+        insane_i4_base(
+            engine_name: "Quantum Flux Inline-4 (Overboost)",
+            forced_induction_type: "turbocharger",
+            forced_induction_max_boost: 200 * units.psi,
+            forced_induction_spool_time: 0.15,
+            forced_induction_decay_time: 0.2,
+            forced_induction_efficiency: 0.68,
+            forced_induction_idle_fraction: 0.3,
+            redline: 19500 * units.rpm
+        );
+}
+
+public node insanity_transmission => mega_transmission { /* void */ }
+public node insanity_vehicle => hyper_vehicle { /* void */ }
+
+public node insanity_main {
+    set_engine(warp_drive_inline4())
+    set_transmission(insanity_transmission())
+    set_vehicle(insanity_vehicle())
+}

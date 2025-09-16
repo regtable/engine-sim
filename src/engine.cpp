@@ -311,6 +311,17 @@ double Engine::getManifoldPressure() const {
     return pressureSum / m_intakeCount;
 }
 
+double Engine::getBoostPressure() const {
+    if (m_intakeCount == 0) return 0.0;
+
+    double pressureSum = 0.0;
+    for (int i = 0; i < m_intakeCount; ++i) {
+        pressureSum += m_intakes[i].getBoostPressure();
+    }
+
+    return pressureSum / m_intakeCount;
+}
+
 double Engine::getIntakeAfr() const {
     double totalOxygen = 0.0;
     double totalFuel = 0.0;

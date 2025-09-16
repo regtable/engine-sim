@@ -10,6 +10,12 @@ To get the newest releases of the game, [click here](https://github.com/Engine-S
 
 This is a real-time internal combustion engine simulation **designed specifically to produce engine audio and simulate engine response characteristics.** It is NOT a scientific tool and cannot be expected to provide accurate figures for the purposes of engineering or engine tuning.
 
+## What's new in this update?
+
+- **Forced induction simulation**: Intakes can now be configured with turbochargers or superchargers, complete with boost pressure, spool characteristics, and compressor efficiency modeling for wild forced-induction builds.
+- **Extreme engine presets**: Three outrageous example engines powered by 110 octane aviation fuel showcase the new boost system, reaching for five-figure horsepower, million-pound-feet torque targets, and driving through a 48-speed gearbox.
+- **Insanity quickstart script**: `assets/main.mr` now loads the new `insanity_collection.mr` showcase by default so you can jump straight into the chaos. Swap engines by calling `warp_drive_inline4()`, `supernova_inline4()`, or `quantum_flux_inline4()` in your own scripts.
+
 ## How do I install it?
 
 This is a code repository and might not look like other software that you're used to downloading and installing (if you're not familiar with programming). To download a ready-to-use version of the application, navigate to the [releases page](https://github.com/ange-yaghi/engine-sim/releases), find the most recent release (ex. `v0.1.5a`), click "Assets" and download the .zip file with a name that starts with `engine-sim-build`. Unzip this file, then run `bin/engine-sim-app.exe`. The simulator should then start normally.
