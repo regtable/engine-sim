@@ -67,6 +67,7 @@ class Engine : public Part {
         virtual void update(double dt);
 
         virtual double getManifoldPressure() const;
+        virtual double getBoostPressure() const;
         virtual double getIntakeAfr() const;
         virtual double getExhaustO2() const;
         virtual double getRpm() const;

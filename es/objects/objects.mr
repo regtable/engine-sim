@@ -492,6 +492,12 @@ public node intake_parameters {
     input runner_length: 4.0 * units.inch;
     input runner_flow_rate: k_carb(200.0);
     input velocity_decay: 0.25;
+    input forced_induction_type [string]: "none";
+    input forced_induction_max_boost: 0.0;
+    input forced_induction_spool_time: 0.25;
+    input forced_induction_decay_time: 0.35;
+    input forced_induction_efficiency: 1.0;
+    input forced_induction_idle_fraction: 0.0;
 }
 
 private node _intake => __engine_sim__intake {
@@ -505,6 +511,12 @@ private node _intake => __engine_sim__intake {
     input throttle_gamma [float];
     input runner_length [float];
     input velocity_decay [float];
+    input forced_induction_type [string];
+    input forced_induction_max_boost [float];
+    input forced_induction_spool_time [float];
+    input forced_induction_decay_time [float];
+    input forced_induction_efficiency [float];
+    input forced_induction_idle_fraction [float];
     alias output __out [intake_channel];
 }
 
@@ -520,6 +532,12 @@ public node intake {
     input throttle_gamma: parameters.throttle_gamma;
     input runner_length: parameters.runner_length;
     input velocity_decay: parameters.velocity_decay;
+    input forced_induction_type: parameters.forced_induction_type;
+    input forced_induction_max_boost: parameters.forced_induction_max_boost;
+    input forced_induction_spool_time: parameters.forced_induction_spool_time;
+    input forced_induction_decay_time: parameters.forced_induction_decay_time;
+    input forced_induction_efficiency: parameters.forced_induction_efficiency;
+    input forced_induction_idle_fraction: parameters.forced_induction_idle_fraction;
     alias output __out [_intake]:
         _intake(
             plenum_volume: plenum_volume,
@@ -531,7 +549,13 @@ public node intake {
             idle_throttle_plate_position: idle_throttle_plate_position,
             throttle_gamma: throttle_gamma,
             runner_length: runner_length,
-            velocity_decay: velocity_decay
+            velocity_decay: velocity_decay,
+            forced_induction_type: forced_induction_type,
+            forced_induction_max_boost: forced_induction_max_boost,
+            forced_induction_spool_time: forced_induction_spool_time,
+            forced_induction_decay_time: forced_induction_decay_time,
+            forced_induction_efficiency: forced_induction_efficiency,
+            forced_induction_idle_fraction: forced_induction_idle_fraction
         );
 }
 

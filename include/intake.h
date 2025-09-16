@@ -7,6 +7,21 @@
 
 class Intake : public Part {
     public:
+        enum class ForcedInductionType {
+            None,
+            Turbocharger,
+            Supercharger
+        };
+
+        struct ForcedInductionParameters {
+            ForcedInductionType type = ForcedInductionType::None;
+            double maxBoostPressure = 0.0;
+            double spoolUpTime = 0.25;
+            double spoolDownTime = 0.35;
+            double efficiency = 1.0;
+            double idleBoostFraction = 0.0;
+        };
+
         struct Parameters {
             // Plenum volume
             double volume;
@@ -34,6 +49,9 @@ class Intake : public Part {
 
             // Velocity decay factor
             double VelocityDecay = 0.5;
+
+            // Forced induction configuration
+            ForcedInductionParameters forcedInduction;
         };
 
     public:
@@ -50,6 +68,10 @@ class Intake : public Part {
         inline double getRunnerLength() const { return m_runnerLength; }
         inline double getPlenumCrossSectionArea() const { return m_crossSectionArea; }
         inline double getVelocityDecay() const { return m_velocityDecay; }
+        inline ForcedInductionType getForcedInductionType() const { return m_forcedInductionParameters.type; }
+        inline double getBoostPressure() const { return m_boostPressure; }
+        inline double getBoostLevel() const { return m_boostLevel; }
+        inline double getBoostTemperature() const { return m_boostTemperature; }
 
         GasSystem m_system;
         double m_throttle;
@@ -59,6 +81,8 @@ class Intake : public Part {
         double m_totalFuelInjected;
 
     protected:
+        void updateForcedInduction(double dt);
+
         double m_crossSectionArea;
         double m_inputFlowK;
         double m_idleFlowK;
@@ -67,6 +91,11 @@ class Intake : public Part {
         double m_idleThrottlePlatePosition;
         double m_runnerLength;
         double m_velocityDecay;
+
+        ForcedInductionParameters m_forcedInductionParameters;
+        double m_boostPressure;
+        double m_boostLevel;
+        double m_boostTemperature;
 
         GasSystem m_atmosphere;
 };
