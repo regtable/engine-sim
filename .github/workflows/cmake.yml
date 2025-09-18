@@ -21,10 +21,10 @@ jobs:
     env:
       # Set your boost version
       BOOST_VERSION: 1.78.0
-      # Parent directory where Boost will be installed
-      BOOST_INSTALL_PARENT: ${{ github.workspace }}
+      # Version string used for directory names
+      BOOST_VERSION_UNDERSCORE: 1_78_0
       # Directory that will contain the Boost installation and is cached between runs
-      BOOST_CACHE_DIR: ${{ github.workspace }}/boost
+      BOOST_BASE_DIR: ${{ github.workspace }}/boost
 
     steps:
     - uses: actions/checkout@v3
@@ -32,10 +32,10 @@ jobs:
     - name: Checkout submodules
       run: git submodule update --init --recursive
 
-    - name: Ensure Boost cache directory
+    - name: Ensure Boost base directory
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Path "${{ env.BOOST_CACHE_DIR }}" -Force | Out-Null
+        New-Item -ItemType Directory -Path "${{ env.BOOST_BASE_DIR }}" -Force | Out-Null
 
 # Retrieve the cache, uses cache@v4
     - name: Cache boost
@@ -43,9 +43,9 @@ jobs:
       id: cache-boost
       with:
         # Set the path to cache
-        path: ${{ env.BOOST_CACHE_DIR }}
+        path: ${{ env.BOOST_BASE_DIR }}
         # Use the version as the key to only cache the correct version
-        key: boost-${{env.BOOST_VERSION}}
+        key: boost-${{ env.BOOST_VERSION }}
 
     # Actual install step (only runs if the cache is empty)
     - name: Install boost
@@ -55,7 +55,7 @@ jobs:
         # Set the boost version (required)
         boost_version: ${{env.BOOST_VERSION}}
         # Set the install directory
-        boost_install_dir: ${{ env.BOOST_INSTALL_PARENT }}
+        boost_install_dir: ${{ env.BOOST_BASE_DIR }}
         # Set your platform version
         platform_version: 2022
         # Set the toolset
@@ -65,29 +65,82 @@ jobs:
       id: locate-boost
       shell: pwsh
       run: |
-        $cacheDir = "${{ env.BOOST_CACHE_DIR }}"
-        if (-not (Test-Path $cacheDir)) {
-          throw "Boost cache directory '$cacheDir' does not exist."
+        $baseDir = "${{ env.BOOST_BASE_DIR }}"
+        if (-not (Test-Path -LiteralPath $baseDir)) {
+          throw "Boost base directory '$baseDir' does not exist."
         }
 
-        $candidates = Get-ChildItem -Path $cacheDir -Directory | Sort-Object Name
-        $boostDir = $candidates | Where-Object { $_.Name -match '^boost_\d' } | Select-Object -First 1
-        if ($null -eq $boostDir) {
-          $boostDir = $candidates | Where-Object { $_.Name -match '^boost' } | Select-Object -First 1
-        }
-        if ($null -eq $boostDir -and $candidates.Count -gt 0) {
-          $boostDir = $candidates[0]
-        }
-
-        if ($null -ne $boostDir) {
-          $boostRoot = $boostDir.FullName
+        $expected = Join-Path $baseDir "boost_${{ env.BOOST_VERSION_UNDERSCORE }}"
+        if (Test-Path -LiteralPath $expected) {
+          $boostRoot = (Get-Item -LiteralPath $expected).FullName
         } else {
-          $boostRoot = $cacheDir
+          $candidates = Get-ChildItem -Path $baseDir -Directory | Sort-Object Name
+          $boostDir = $candidates | Where-Object { $_.Name -match '^boost' } | Select-Object -First 1
+          if ($null -ne $boostDir) {
+            $boostRoot = $boostDir.FullName
+          } else {
+            $boostRoot = $baseDir
+          }
         }
 
         Write-Host "Using Boost root at $boostRoot"
         "boost-root=$boostRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
         "BOOST_ROOT=$boostRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Normalize Boost directory links for cache
+      if: steps.cache-boost.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        $boostRoot = "${{ steps.locate-boost.outputs.boost-root }}"
+        if ([string]::IsNullOrWhiteSpace($boostRoot)) {
+          Write-Warning "Boost root output was empty, skipping normalization."
+          exit 0
+        }
+        if (-not (Test-Path -LiteralPath $boostRoot)) {
+          Write-Warning "Boost root '$boostRoot' was not found, skipping normalization."
+          exit 0
+        }
+
+        $links = Get-ChildItem -LiteralPath $boostRoot -Recurse -Attributes ReparsePoint
+        if ($links.Count -eq 0) {
+          Write-Host "No reparse points detected under '$boostRoot'."
+          exit 0
+        }
+
+        Write-Host "Normalizing $($links.Count) Boost reparse points for cache compatibility."
+        foreach ($link in $links) {
+          $linkItem = Get-Item -LiteralPath $link.FullName
+          $target = $linkItem.Target
+          if ([string]::IsNullOrWhiteSpace($target)) {
+            Write-Warning "Skipping link with empty target: $($link.FullName)"
+            continue
+          }
+
+          try {
+            $resolvedPath = (Resolve-Path -LiteralPath (Join-Path $link.DirectoryName $target)).ProviderPath
+          } catch {
+            Write-Warning "Failed to resolve target '$target' for '$($link.FullName)': $_"
+            continue
+          }
+
+          $resolvedItem = Get-Item -LiteralPath $resolvedPath
+
+          Remove-Item -LiteralPath $link.FullName -Force
+
+          if ($resolvedItem.PSIsContainer) {
+            New-Item -ItemType Directory -Path $link.FullName -Force | Out-Null
+            robocopy $resolvedPath $link.FullName /E /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
+            $rc = $LASTEXITCODE
+            if ($rc -ge 8) {
+              throw "Robocopy failed for '$($link.FullName)' with exit code $rc"
+            }
+            $LASTEXITCODE = 0
+          } else {
+            Copy-Item -LiteralPath $resolvedPath -Destination $link.FullName -Force
+          }
+        }
+
+        Write-Host "Finished normalizing Boost reparse points."
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
