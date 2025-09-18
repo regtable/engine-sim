@@ -30,9 +30,9 @@ jobs:
     - name: Checkout submodules
       run: git submodule update --init --recursive
     
-# Retrieve the cache, uses cache@v2
+# Retrieve the cache, uses cache@v4
     - name: Cache boost
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       id: cache-boost
       with:
         # Set the path to cache
