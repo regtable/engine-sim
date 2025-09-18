@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-latest
     env:
       # Set your boost version
-      BOOST_VERSION: 1.78.0
+      BOOST_VERSION: 2.3.0
       # Set you boost path to the default one (I don't know if you can use variables here)
       BOOST_PATH: ${{github.workspace}}/boost/
       
