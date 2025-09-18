@@ -1,6 +1,7 @@
 import "engine_sim.mr"
 import "themes/default.mr"
 import "engines/extreme/insanity_collection.mr"
+import "engines/modern/forced_induction_collection.mr"
 
 use_default_theme()
-insanity_main()
+modern_forced_induction_main()
